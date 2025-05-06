@@ -1,0 +1,129 @@
+# rjceledon on 05/06/2025
+
+# This script works with the Samsung Touch Centralized Controller (TCC 2.0) to set the option Wind-Free for all AC Units, only user must provide IP of the controller, wether to activate or deactivate the option, and the password for the system
+
+# [!] Usage: .\SamsungWindFreeOpt.ps1 -IP "10.0.0.120" -ActivateWindFree $true -Password "your_password"
+
+# List of AC units are given in the body of the request, in XML format with the unit address code found in the panel
+
+param (
+    $IP,
+    $ActivateWindFree,
+    $Password
+)
+
+$scriptFileName = Split-Path -Leaf $PSCommandPath
+
+function Press-AnyKeyToContinue {
+    Write-Host -ForegroundColor Red "[!] Press any key to continue..."
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    exit
+}
+
+function Show-Usage {
+    Write-Host -ForegroundColor Red "[!] Usage: " -NoNewline
+    Write-Host -ForegroundColor Yellow ".\$scriptFileName " -NoNewline
+    Write-Host -ForegroundColor DarkGray "-IP " -NoNewline
+    Write-Host -ForegroundColor DarkCyan "`"10.0.0.120`" " -NoNewline
+    Write-Host -ForegroundColor DarkGray "-ActivateWindFree " -NoNewline
+    Write-Host -ForegroundColor Green "`$true " -NoNewline
+    Write-Host -ForegroundColor DarkGray "-Password " -NoNewline
+    Write-Host -ForegroundColor DarkCyan "`"your_password`""
+}
+
+
+if ([string]::IsNullOrEmpty($IP) -or [string]::IsNullOrEmpty($ActivateWindFree) -or [string]::IsNullOrEmpty($Password)) {
+    Show-Usage
+    Press-AnyKeyToContinue
+}
+
+if ($IP -notmatch '^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$') {
+    Write-Host -ForegroundColor Red "[!] Invalid IP format"
+    Press-AnyKeyToContinue
+}
+
+# Validate ActivateWindFree boolean input
+if ($ActivateWindFree -ne $true -and $ActivateWindFree -ne $false) {
+    Write-Host -ForegroundColor Red "[!] Invalid value for ActivateWindFree. Please provide either " -NoNewline
+    Write-Host -ForegroundColor Green "`$true " -NoNewline
+    Write-Host -ForegroundColor Red "or " -NoNewline
+    Write-Host -ForegroundColor Green "`$false."
+    Press-AnyKeyToContinue
+}
+
+# Validate Password
+if (-not $Password) {
+    Write-Host -ForegroundColor Red "[!] Password cannot be empty"
+    Press-AnyKeyToContinue
+}
+
+# Bypass SSL/TLS trust relationship error
+if ("TrustAllCertsPolicy" -as [type]) {} else {
+        Add-Type "using System.Net;using System.Security.Cryptography.X509Certificates;public class TrustAllCertsPolicy : ICertificatePolicy {public bool CheckValidationResult(ServicePoint srvPoint, X509Certificate certificate, WebRequest request, int certificateProblem) {return true;}}"
+        [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+}
+
+# Get login request
+$headers = @{
+    Host = $IP
+    'Content-Type' = 'application/json'
+    Origin = "https://$IP"
+    Referer = "https://$IP/tcc2/"
+}
+
+$body = "{`"commandType`":`"login`",`"id`":`"admin`",`"password`":`"$Password`"}"
+
+$response = Invoke-RestMethod -Uri "https://$IP/tcc2/LoginServlet" -Method Post -Headers $headers -Body $body
+
+# Check if login was successful
+if ($response.result -ne "success") {
+    Write-Host -ForegroundColor Red "[!] Login failed: $($response.result)"
+    Press-AnyKeyToContinue
+}
+
+# Extract session ID from the response
+$sessionId = $response.sessionId
+Write-Host -ForegroundColor Green "[+] Login success: $sessionId"
+
+$Cookie = New-Object System.Net.Cookie
+$Cookie.Name = "JSESSIONID" # Add the name of the cookie
+$Cookie.Value = "$sessionId.node0" # Add the value of the cookie
+$Cookie.Domain = $IP
+
+$WebSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+$WebSession.Cookies.Add($Cookie)
+
+# Set headers for the activation/deactivation request
+
+if ($ActivateWindFree) {
+    $body = @"
+00000000-0000-0000-0000-000000000000:<?xml version='1.0' encoding='UTF-8'?><root><header sa='web' da='tcc2' messageType='request' dateTime='2000-01-01T00:00:00:000' dvmControlMode='individual'/><setDeviceControl><controlList><control><controlValue><alternativeMode>9</alternativeMode></controlValue><addressList><address>11.00.00</address><address>11.00.01</address><address>11.00.06</address><address>11.00.09</address><address>11.00.13</address><address>11.00.14</address><address>11.00.17</address><address>11.00.19</address><address>11.01.00</address><address>11.01.03</address><address>11.01.06</address><address>11.01.07</address><address>11.01.02</address><address>11.01.08</address><address>11.00.02</address><address>11.00.03</address><address>11.00.05</address><address>11.00.07</address><address>11.00.08</address><address>11.00.10</address><address>11.00.11</address><address>11.00.12</address><address>11.00.15</address><address>11.00.16</address><address>11.00.18</address><address>11.00.20</address><address>11.00.21</address><address>11.01.04</address><address>11.01.05</address></addressList></control></controlList></setDeviceControl></root>
+"@
+} else {
+    $body = @"
+00000000-0000-0000-0000-000000000000:<?xml version='1.0' encoding='UTF-8'?><root><header sa='web' da='tcc2' messageType='request' dateTime='2000-01-01T00:00:00:000' dvmControlMode='individual'/><setDeviceControl><controlList><control><controlValue><alternativeMode>false</alternativeMode></controlValue><addressList><address>11.00.00</address><address>11.00.01</address><address>11.00.06</address><address>11.00.09</address><address>11.00.13</address><address>11.00.14</address><address>11.00.17</address><address>11.00.19</address><address>11.01.00</address><address>11.01.03</address><address>11.01.06</address><address>11.01.07</address><address>11.01.02</address><address>11.01.08</address><address>11.00.02</address><address>11.00.03</address><address>11.00.05</address><address>11.00.07</address><address>11.00.08</address><address>11.00.10</address><address>11.00.11</address><address>11.00.12</address><address>11.00.15</address><address>11.00.16</address><address>11.00.18</address><address>11.00.20</address><address>11.00.21</address><address>11.01.04</address><address>11.01.05</address></addressList></control></controlList></setDeviceControl></root>
+"@
+}
+
+$response = Invoke-RestMethod -Uri "https://$IP/tcc2/getMonitoring" -Method Post -Headers $headers -Body $body -WebSession $WebSession
+$ControlCount = $response.detailControlInfo[1].deviceControlCount
+
+
+if ($ControlCount -eq 0) {
+    Write-Host -ForegroundColor Yellow "[ ] Command succeeded, no changes applied: $($response.detailControlInfo[1])"
+} elseif ($ControlCount -gt 0) {
+    Write-Host -ForegroundColor Green "[+] Command succeeded: $($response.detailControlInfo[1])"
+} else {
+    Write-Host -ForegroundColor Red "[!] Error in command: $($response)"
+}
+
+# Logout
+$body = '{"commandType":"logout"}'
+
+$response = Invoke-RestMethod -Uri "https://$IP/tcc2/LoginServlet" -Method Post -Headers $headers -Body $body -WebSession $WebSession
+
+# Check if logout was successful
+if ($response.result -ne "success") {
+    Write-Host -ForegroundColor Red "[!] Logout failed: $response.result"
+    Press-AnyKeyToContinue
+}
