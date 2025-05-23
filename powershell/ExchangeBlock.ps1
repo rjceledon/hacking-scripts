@@ -1,4 +1,5 @@
-//[!] Usage: .\ExchangeBlock.ps1 -Item "user@domain.com|domain.com" -Notes "Additional notes... Ticket Number#"
+#[!] Usage: .\ExchangeBlock.ps1 -Item "user@domain.com|domain.com" -Notes "Additional notes... Ticket Number#"
+#rjceledon May 2025
 
 param (
     $Notes,
